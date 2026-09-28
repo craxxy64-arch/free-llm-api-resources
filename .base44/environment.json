@@ -1,0 +1,12 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/",
+  "startCommand": "docker compose -f docker-compose.base44.yml up -d",
+  "secrets": [
+    {"name": "GROQ_API_KEY", "description": "Groq API key (generator only)", "requiredAtBoot": false},
+    {"name": "CLOUDFLARE_ACCOUNT_ID", "description": "Cloudflare account ID (generator only)", "requiredAtBoot": false},
+    {"name": "CLOUDFLARE_API_KEY", "description": "Cloudflare Workers AI API token (generator only)", "requiredAtBoot": false},
+    {"name": "GCP_PROJECT_ID", "description": "GCP project for Gemini quota lookup (generator only)", "requiredAtBoot": false},
+    {"name": "GCP_SERVICE_ACCOUNT_JSON", "description": "GCP service account key JSON; written to a temp file and used as GOOGLE_APPLICATION_CREDENTIALS (generator only)", "requiredAtBoot": false}
+  ]
+}

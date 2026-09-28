@@ -1,0 +1,60 @@
+# Base44 dev environment.
+# This repo is a Markdown list (README.md) + a generator script (src/pull_available_models.py).
+# - preview:   renders README.md from the bind-mounted source on every request (refresh to see edits).
+# - generator: on-demand only (profile "generate"); calls provider APIs and rewrites README.md.
+#     docker compose -f docker-compose.base44.yml run --rm generator
+
+configs:
+  render_py:
+    content: |
+      import http.server, markdown, pathlib
+      TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <title>Free LLM API resources</title>
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5/github-markdown-light.min.css">
+      <style>body{margin:0;background:#fff}.markdown-body{max-width:1100px;margin:0 auto;padding:32px 24px}</style>
+      </head><body><article class="markdown-body">%s</article></body></html>"""
+      class H(http.server.BaseHTTPRequestHandler):
+          def do_GET(self):
+              if self.path.split("?")[0] not in ("/", "/index.html"):
+                  self.send_response(404); self.end_headers(); return
+              md = pathlib.Path("/app/README.md").read_text(encoding="utf-8")
+              body = (TEMPLATE % markdown.markdown(md, extensions=["tables", "fenced_code"])).encode()
+              self.send_response(200)
+              self.send_header("Content-Type", "text/html; charset=utf-8")
+              self.send_header("Cache-Control", "no-store")
+              self.end_headers(); self.wfile.write(body)
+      http.server.ThreadingHTTPServer(("0.0.0.0", 3000), H).serve_forever()
+
+services:
+  preview:
+    image: python:3.12-slim
+    working_dir: /app
+    volumes:
+      - ./:/app:ro
+    configs:
+      - source: render_py
+        target: /render.py
+    command: sh -c "pip install --quiet --disable-pip-version-check markdown && python -u /render.py"
+    ports:
+      - "3000:3000"
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; r=urllib.request.urlopen('http://127.0.0.1:3000/',timeout=3); sys.exit(0 if b'markdown-body' in r.read() else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  generator:
+    image: python:3.12-slim
+    profiles: ["generate"]
+    working_dir: /app/src
+    volumes:
+      - ./:/app
+    env_file:
+      - /run/base44/app.env
+    command: >
+      sh -c "pip install --quiet --disable-pip-version-check -r requirements.txt &&
+      if [ -n \"$$GCP_SERVICE_ACCOUNT_JSON\" ]; then printf '%s' \"$$GCP_SERVICE_ACCOUNT_JSON\" > /tmp/gcp.json && export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp.json; fi &&
+      python -u pull_available_models.py"
