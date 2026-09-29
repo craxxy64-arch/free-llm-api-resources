@@ -1,0 +1,10 @@
+{
+  "providers": {
+    "groq": {"base": "https://api.groq.com/openai/v1", "env": "GROQ_API_KEY", "models": ["llama-3.3-70b-versatile"]},
+    "openrouter": {"base": "https://openrouter.ai/api/v1", "env": "OPENROUTER_API_KEY", "models": ["deepseek/deepseek-r1:free"]}
+  },
+  "chains": {
+    "fast":  ["groq/llama-3.1-8b-instant", "cerebras/llama3.1-8b"],
+    "smart": ["groq/llama-3.3-70b-versatile", "openrouter/deepseek/deepseek-r1:free", "gemini/gemini-2.0-flash"]
+  }
+}
