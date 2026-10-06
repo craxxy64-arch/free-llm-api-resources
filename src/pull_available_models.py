@@ -7,6 +7,8 @@ import os
 from dotenv import load_dotenv
 from google.cloud import cloudquotas_v1
 
+import db
+
 load_dotenv()
 
 MODEL_TO_NAME_MAPPING = {
@@ -395,12 +397,17 @@ def main():
     <tbody>
 """
 
+    conn = db.connect()
+    pull_id = db.start_pull(conn)
+
     groq_models = fetch_groq_models()
+    db.save_models(conn, pull_id, "groq", groq_models)
     for idx, model in enumerate(groq_models):
         # markdown_table += f"|{'[Groq](https://console.groq.com)' if idx == 0 else '^'}|{ ' ' if idx == 0 else '^'}|{model['name']}|{get_human_limits(model)}|\n"
         table += f"<tr>{f'<td rowspan="{len(groq_models)}"><a href="https://console.groq.com" target="_blank">Groq</a></td>' if idx == 0 else ''}{ f'<td rowspan="{len(groq_models)}"></td>' if idx == 0 else ''}<td>{model['name']}</td><td>{get_human_limits(model)}</td></tr>\n"
 
     openrouter_models = fetch_openrouter_models()
+    db.save_models(conn, pull_id, "openrouter", openrouter_models)
     for idx, model in enumerate(openrouter_models):
         #     markdown_table += f"|{'[OpenRouter](https://openrouter.ai)' if idx == 0 else '^'}|{ ' ' if idx == 0 else '^'}|{model['name']}|{get_human_limits(model)}|\n"
         table += f"<tr>{f'<td rowspan="{len(openrouter_models)}"><a href="https://openrouter.ai" target="_blank">OpenRouter</a></td>' if idx == 0 else ''}{ f'<td rowspan="{len(openrouter_models)}"></td>' if idx == 0 else ''}<td>{model['name']}</td><td>{get_human_limits(model)}</td></tr>\n"
@@ -413,6 +420,12 @@ def main():
     #     "|^|^|embedding-001|1500 requests/min<br>100 contents/batch|\n"
     # )
     gemini_models = fetch_gemini_limits()
+    db.save_models(
+        conn,
+        pull_id,
+        "gemini",
+        [{"id": k, "name": k, "limits": v} for k, v in gemini_models.items() if k],
+    )
     table += f"""<tr>
             <td rowspan="6"><a href="https://aistudio.google.com" target="_blank">Google AI Studio</a></td>
             <td rowspan="4">Free tier Gemini API access not available within UK/CH/EEA/EU/<br>Data is used for training.</td>
@@ -470,16 +483,19 @@ def main():
         </tr>"""
 
     hyperbolic_models = fetch_hyperbolic_models()
+    db.save_models(conn, pull_id, "hyperbolic", hyperbolic_models)
     for idx, model in enumerate(hyperbolic_models):
         # markdown_table += f"|{'[Hyperbolic](https://app.hyperbolic.xyz/)' if idx == 0 else '^'}|{ ' ' if idx == 0 else '^'}|{model['name']}| |\n"
         table += f"<tr>{f'<td rowspan="{len(hyperbolic_models)}"><a href="https://app.hyperbolic.xyz/" target="_blank">Hyperbolic (Free Testing Period)</a></td>' if idx == 0 else ''}{ f'<td rowspan="{len(hyperbolic_models)}"></td>' if idx == 0 else ''}<td>{model['name']}</td><td>{get_human_limits(model)}</td></tr>\n"
 
     ovh_models = fetch_ovh_models()
+    db.save_models(conn, pull_id, "ovh", ovh_models)
     for idx, model in enumerate(ovh_models):
         # markdown_table += f"|{'[OVH AI Endpoints (Free Alpha)](https://endpoints.ai.cloud.ovh.net/)' if idx == 0 else '^'}|{ 'Token expires every 2 weeks.' if idx == 0 else '^'}|{model['name']}|{get_human_limits(model)}|\n"
         table += f"<tr>{f'<td rowspan="{len(ovh_models)}"><a href="https://endpoints.ai.cloud.ovh.net/" target="_blank">OVH AI Endpoints (Free Alpha)</a></td>' if idx == 0 else ''}{ f'<td rowspan="{len(ovh_models)}">Token expires every 2 weeks.</td>' if idx == 0 else ''}<td>{model['name']}</td><td>{get_human_limits(model)}</td></tr>\n"
 
     cloudflare_models = fetch_cloudflare_models()
+    db.save_models(conn, pull_id, "cloudflare", cloudflare_models)
     for idx, model in enumerate(cloudflare_models):
         # markdown_table += f"|{'[Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai)' if idx == 0 else '^'}|{ '10000 neurons/day<br>Beta models have unlimited usage.<br>Typically 300 requests/min for text models.' if idx == 0 else '^'}|{model['name']}| |\n"
         table += f"<tr>{f'<td rowspan="{len(cloudflare_models)}"><a href="https://developers.cloudflare.com/workers-ai" target="_blank">Cloudflare Workers AI</a></td>' if idx == 0 else ''}{ f'<td rowspan="{len(cloudflare_models)}">10000 neurons/day<br>Beta models have unlimited usage.<br>Typically 300 requests/min for text models.</td>' if idx == 0 else ''}<td>{model['name']}</td><td></td></tr>\n"
@@ -492,6 +508,7 @@ def main():
         </tr>"""
 
     table += "</tbody></table>"
+    conn.close()
 
     print("Missing models:")
     print(list(MISSING_MODELS))
